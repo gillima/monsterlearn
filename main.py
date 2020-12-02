@@ -1,12 +1,15 @@
 import tkinter as tk
+
+import click
 from PIL import ImageTk, Image
 
 from exercises import *
 
 
 class Monster:
-    def __init__(self, root, exercise):
+    def __init__(self, root, exercise, **kwargs):
         self._root = root
+        self._handicap = kwargs.get('handicap', 500)
         self._exercise = exercise
         self.game_state = None
         self._reset()
@@ -27,6 +30,10 @@ class Monster:
             return False
         finally:
             self._raise_state('exercise', '')
+
+    @property
+    def result_width(self):
+        return self._exercise.result_width
 
     @property
     def exercise(self):
@@ -60,7 +67,7 @@ class Monster:
 
     def _reset(self):
         self._monster = 0
-        self._player = 500
+        self._player = self._handicap
         self._castle = 1000
         self._game_over = False
         self._game_running = False
@@ -75,10 +82,12 @@ class Monster:
         if self._monster >= self._player:
             self._game_over = True
             self._game_running = False
+            self._handicap = min(900, self._handicap + 50)
             self._raise_state('wins', 'monster')
         if self._player >= self._castle:
             self._game_over = True
             self._game_running = False
+            self._handicap = max(100, self._handicap - 50)
             self._raise_state('wins', 'player')
 
     def _tick(self):
@@ -124,6 +133,8 @@ class Sprite:
 
 
 class Ui(tk.Frame):
+    font_size = 50
+
     def __init__(self, game, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.master.title('Monster 1x1')
@@ -136,11 +147,11 @@ class Ui(tk.Frame):
         self._interact.pack(padx=10, pady=10, expand=1)
 
         self._exercise = tk.Label(self._interact, text='')
-        self._exercise.config(font=('bold', 70))
+        self._exercise.config(font=('bold', Ui.font_size))
         self._exercise.pack(side=tk.LEFT)
 
-        self._input = tk.Entry(self._interact, width=2)
-        self._input.config(font=('normal', 70))
+        self._input = tk.Entry(self._interact, width=game.result_width)
+        self._input.config(font=('normal', Ui.font_size))
         self._input.pack(side=tk.LEFT)
 
         self._init_sprites()
@@ -187,7 +198,7 @@ class Ui(tk.Frame):
         self._monster_wins.visible = False
         self._player.visible = True
         self._player_wins.visible = False
-        self._exercise.config(text=f'{self._game.exercise}=')
+        self._exercise.config(text=f'{self._game.exercise} ')
 
     def _on_game_state(self, event, source, *args, **kwargs):
         if event == 'moved':
@@ -204,12 +215,46 @@ class Ui(tk.Frame):
         elif event == 'reset':
             self._reset()
         elif event == 'exercise':
-            self._exercise.config(text=f'{self._game.exercise}=')
+            self._exercise.config(text=f'{self._game.exercise} ')
+
+
+def run(exercise):
+    root = tk.Tk()
+    # exercise = SimpleMultiplication()
+    # exercise = ReadNumbers()
+    game = Monster(root, exercise)
+    ui = Ui(game, root, width=1920, height=768)
+    root.mainloop()
+
+
+@click.command(help='Use addition to fill up to the target value')
+@click.argument('target', default=1000, type=int)
+def fill(target):
+    exercise = FillMeUp(target=target)
+    run(exercise)
+
+
+@click.command(help='Simple multiplication in the range from 1..10')
+def multiplication():
+    exercise = SimpleMultiplication()
+    run(exercise)
+
+
+@click.command(help='Read written numbers')
+def read_numbers():
+    exercise = ReadNumbers()
+    run(exercise)
+
+
+@click.group()
+def exercises():
+  pass
+
+
+exercises.add_command(fill)
+exercises.add_command(multiplication)
+exercises.add_command(read_numbers)
 
 
 if __name__ == '__main__':
-    root = tk.Tk()
-    game = Monster(root, SimpleMultiplication())
-    # game = Monster(root, ReadNumbers())
-    ui = Ui(game, root, width=1920, height=768)
-    root.mainloop()
+    exercises()
